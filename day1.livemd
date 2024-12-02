@@ -1,0 +1,57 @@
+# Day 1
+
+```elixir
+Mix.install([
+  {:kino, "~> 0.11.0"}
+])
+```
+
+## Part 1
+
+```elixir
+input_box = Kino.Input.textarea("input")
+```
+
+```elixir
+input = Kino.Input.read(input_box)
+```
+
+```elixir
+result_1 =
+  input
+  |> String.split("\n")
+  |> Enum.map(&String.split(&1, ~r/\s+/))
+  |> Enum.map(&List.to_tuple/1)
+  |> Enum.unzip()
+  |> Tuple.to_list()
+  |> Enum.map(&Enum.sort/1)
+  |> Enum.zip()
+  |> Enum.map(fn {left, right} ->
+    (String.to_integer(left) - String.to_integer(right)) |> abs()
+  end)
+  |> Enum.sum()
+```
+
+## Part 2
+
+```elixir
+lists =
+  input
+  |> String.split("\n")
+  |> Enum.map(&String.split(&1, ~r/\s+/))
+  |> Enum.map(&List.to_tuple/1)
+  |> Enum.unzip()
+  |> Tuple.to_list()
+
+[list_1, list_2] = lists
+
+list_1 = Enum.map(list_1, &String.to_integer/1)
+list_2 = Enum.map(list_2, &String.to_integer/1)
+
+freq_2 = Enum.frequencies(list_2)
+
+ss =
+  list_1
+  |> Enum.map(&((freq_2[&1] || 0) * &1))
+  |> Enum.sum()
+```
