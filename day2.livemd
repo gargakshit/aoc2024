@@ -1,0 +1,88 @@
+# Day 2
+
+```elixir
+Mix.install([
+  {:kino, "~> 0.11.0"}
+])
+```
+
+## Inputs
+
+```elixir
+input_box = Kino.Input.textarea("input")
+```
+
+```elixir
+input = Kino.Input.read(input_box)
+input_lines = String.split(input, "\n")
+```
+
+## Part 1
+
+```elixir
+defmodule Safety1 do
+  def is_safe([first, second | _] = list) do
+    kind = if first < second, do: :asc, else: :desc
+    is_safe(list, kind)
+  end
+
+  defp is_safe([_head | []], _kind), do: true
+  
+  defp is_safe([first, second | _] = [_head | tail], :asc) do
+    cond do
+      second - first > 3 || second - first < 1 -> false
+      true -> is_safe(tail, :asc)
+    end
+  end
+
+  defp is_safe([first, second | _] = [_head | tail], :desc) do
+    cond do
+      first - second > 3 || first - second < 1 -> false
+      true -> is_safe(tail, :desc)
+    end
+  end
+end
+
+input_lines
+|> Enum.map(fn line -> line |> String.split(" ") |> Enum.map(&String.to_integer/1) end)
+|> Enum.count(&Safety1.is_safe/1)
+```
+
+## Part 2 (Probably broken but works for me lol)
+
+```elixir
+defmodule Safety2 do
+  def is_safe([first, second | _] = list) do
+    kind = if first < second, do: :asc, else: :desc
+    is_safe(list, kind, true)
+  end
+
+  defp is_safe([_head | []], _kind, _elves_can_get_away_with_reactor_going_wild), do: true
+  
+  defp is_safe([first, second | _] = [_head | tail], :asc, elves_can_get_away_with_reactor_going_wild) do
+    cond do
+      second - first > 3 || second - first < 1 ->
+        if elves_can_get_away_with_reactor_going_wild,
+          do: is_safe(tail, :asc, false),
+          else: false
+
+      true -> is_safe(tail, :asc, elves_can_get_away_with_reactor_going_wild)
+    end
+  end
+
+  defp is_safe([first, second | _] = [_head | tail], :desc, elves_can_get_away_with_reactor_going_wild) do
+    cond do
+      first - second > 3 || first - second < 1 -> 
+        if elves_can_get_away_with_reactor_going_wild,
+          do: is_safe(tail, :desc, false),
+          else: false
+
+      true -> is_safe(tail, :desc, elves_can_get_away_with_reactor_going_wild)
+    end
+  end
+end
+
+input_lines
+|> Enum.map(fn line -> line |> String.split(" ") |> Enum.map(&String.to_integer/1) end)
+|> Enum.count(&Safety2.is_safe/1)
+```
