@@ -1,0 +1,43 @@
+# Day 2 - fork
+
+```elixir
+Mix.install([
+  {:kino, "~> 0.11.0"}
+])
+```
+
+## Inputs
+
+```elixir
+input_box = Kino.Input.textarea("input")
+```
+
+```elixir
+input = Kino.Input.read(input_box)
+```
+
+## Part 1
+
+```elixir
+Regex.scan(~r/mul\((\d+),(\d+)\)/, input)
+|> Enum.map(fn [_, l, r] -> String.to_integer(l) * String.to_integer(r) end)
+|> Enum.sum()
+```
+
+## Part 2
+
+```elixir
+# this is a very weird way way to go about this.
+
+input
+|> String.split("do()")
+|> Enum.map(&String.split(&1, "don't()"))
+# Invariant: Each element of the outer list starts with the parser enabled.
+|> Enum.map(fn [head | _tail] ->
+  # Parser should only be enabled for the first element.
+  Regex.scan(~r/mul\((\d+),(\d+)\)/, head)
+  |> Enum.map(fn [_, l, r] -> String.to_integer(l) * String.to_integer(r) end)
+  |> Enum.sum()
+end)
+|> Enum.sum()
+```
