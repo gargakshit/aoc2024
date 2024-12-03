@@ -1,4 +1,4 @@
-# Day 2 - fork
+# Day 3
 
 ```elixir
 Mix.install([
