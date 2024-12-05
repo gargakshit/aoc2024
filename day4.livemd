@@ -1,0 +1,128 @@
+# Day 4
+
+```elixir
+Mix.install([
+  {:kino, "~> 0.11.0"}
+])
+```
+
+## Inputs
+
+```elixir
+input_box = Kino.Input.textarea("input")
+```
+
+```elixir
+input = Kino.Input.read(input_box)
+
+charlist =
+  input
+  |> String.split("\n")
+  |> Enum.map(&String.to_charlist/1)
+  |> IO.inspect(label: "charlist")
+
+transposed_charlist =
+  charlist
+  |> Enum.zip()
+  |> Enum.map(&Tuple.to_list/1)
+  |> IO.inspect(label: "transposed charlist")
+```
+
+## Part 1
+
+```elixir
+horizontal =
+  charlist
+  |> Enum.map(&Enum.chunk_every(&1, 4, 1))
+  |> Enum.map(&Enum.count(&1, fn s -> s === ~c"XMAS" || s === ~c"SAMX" end))
+  |> Enum.sum()
+  |> IO.inspect(label: "horizontal")
+
+vertical =
+  transposed_charlist
+  |> Enum.map(&Enum.chunk_every(&1, 4, 1))
+  |> Enum.map(&Enum.count(&1, fn s -> s === ~c"XMAS" || s === ~c"SAMX" end))
+  |> Enum.sum()
+  |> IO.inspect(label: "vertical")
+
+defmodule Diagonal do
+  def check(charlist) do
+    # Assuming its a square.
+    check(charlist, length(charlist), length(charlist))
+  end
+  
+  defp check(charlist, max_x, max_y) do
+    for x <- 0..(max_x - 1), y <- 0..(max_y - 1), reduce: 0 do
+      acc -> acc +
+        check_br(charlist, x, y, max_x, max_y) +
+        check_bl(charlist, x, y, max_x, max_y)
+    end
+  end
+
+  defp check_br(charlist, x, y, max_x, max_y) when
+    x + 3 < max_x and y + 3 < max_y,
+    do: check_quad([
+      Enum.at(charlist, y + 0) |> Enum.at(x + 0),
+      Enum.at(charlist, y + 1) |> Enum.at(x + 1),
+      Enum.at(charlist, y + 2) |> Enum.at(x + 2),
+      Enum.at(charlist, y + 3) |> Enum.at(x + 3)
+    ])
+  defp check_br(_, _, _, _, _), do: 0
+
+  defp check_bl(charlist, x, y, max_x, _max_y) when
+    y - 3 >= 0 and x + 3 < max_x,
+    do: check_quad([
+      Enum.at(charlist, y - 0) |> Enum.at(x + 0),
+      Enum.at(charlist, y - 1) |> Enum.at(x + 1),
+      Enum.at(charlist, y - 2) |> Enum.at(x + 2),
+      Enum.at(charlist, y - 3) |> Enum.at(x + 3)
+    ])
+  defp check_bl(_, _, _, _, _), do: 0
+
+  defp check_quad(~c"XMAS"), do: 1
+  defp check_quad(~c"SAMX"), do: 1
+  defp check_quad(_), do: 0
+end
+
+diagonal = Diagonal.check(charlist) |> IO.inspect(label: "diagonal")
+
+horizontal + vertical + diagonal
+```
+
+## Part 2
+
+```elixir
+defmodule MAS do
+  def check(charlist) do
+    # Assuming its a square.
+    # We count everything twice.
+    check(charlist, length(charlist), length(charlist))
+  end
+  
+  defp check(charlist, max_x, max_y) do
+    for x <- 1..(max_x - 2), y <- 1..(max_y - 2), reduce: 0 do
+      acc -> acc + (if check_cross(charlist, x, y), do: 1, else: 0)
+    end
+  end
+
+  defp check_cross(charlist, x, y) do
+    relevant_chars =
+      [
+        Enum.at(charlist, y - 1) |> Enum.at(x - 1),
+        Enum.at(charlist, y - 1) |> Enum.at(x + 1),
+        Enum.at(charlist, y - 0) |> Enum.at(x - 0),
+        Enum.at(charlist, y + 1) |> Enum.at(x - 1),
+        Enum.at(charlist, y + 1) |> Enum.at(x + 1),
+      ]
+
+    IO.inspect(relevant_chars, label: "x=#{x}, y=#{y}")
+
+    relevant_chars == ~c"MMASS"
+      || relevant_chars == ~c"SSAMM"
+      || relevant_chars == ~c"MSAMS"
+      || relevant_chars == ~c"SMASM"
+  end
+end
+
+MAS.check(charlist)
+```

@@ -1,0 +1,107 @@
+# Day 5
+
+```elixir
+Mix.install([
+  {:kino, "~> 0.11.0"}
+])
+```
+
+## Inputs
+
+```elixir
+rules_box = Kino.Input.textarea("rules")
+```
+
+```elixir
+updates_box = Kino.Input.textarea("updates")
+```
+
+```elixir
+rules =
+  Kino.Input.read(rules_box)
+  |> String.split("\n")
+  |> Enum.map(&String.split(&1, "|"))
+  |> Enum.map(fn line -> Enum.map(line, &String.to_integer/1) end)
+  |> IO.inspect(label: "rules")
+
+updates =
+  Kino.Input.read(updates_box)
+  |> String.split("\n")
+  |> Enum.map(&String.split(&1, ","))
+  |> Enum.map(fn line -> Enum.map(line, &String.to_integer/1) end)
+  |> IO.inspect(label: "updates")
+
+nil
+```
+
+## Part 1
+
+```elixir
+defmodule OrderChecker do
+  def check(_rules, [_last_page]), do: true
+
+  def check(rules, [page | remaining_pages]),
+    do: pages_satisfy_rules?(rules, page, remaining_pages) && check(rules, remaining_pages)
+
+  defp pages_satisfy_rules?(_rules, _page, []), do: true
+
+  defp pages_satisfy_rules?(rules, page, [remaining_page | remaining_pages]),
+    do: page_satisfies_rules?(rules, page, remaining_page) && pages_satisfy_rules?(rules, page, remaining_pages)
+
+  defp page_satisfies_rules?([], _page, _remaining_page), do: false
+
+  defp page_satisfies_rules?([[before, aft] | _remaining_rules], page, remaining_page) when
+    before == page and aft == remaining_page, do: true
+
+  defp page_satisfies_rules?([[_before, _after] | remaining_rules], page, remaining_page),
+    do: page_satisfies_rules?(remaining_rules, page, remaining_page)
+end
+
+updates
+|> Enum.map(&({&1, OrderChecker.check(rules, &1)}))
+|> Enum.map(fn
+  {update, true} -> Enum.at(update, length(update) |> div(2))
+  {_update, false} -> 0
+end)
+|> Enum.sum()
+|> IO.inspect(label: "sum of mid elements of updates in order")
+```
+
+## Part 2
+
+```elixir
+defmodule Sorter do
+  def sort(rules, pages), do:
+    pages
+    |> Enum.zip(cost(rules, pages))
+    |> Enum.sort_by(&elem(&1, 1), :desc)
+    |> Enum.unzip()
+    |> elem(0)
+
+  defp cost(rules, pages), do:
+    Enum.map(pages, &page_cost(rules, pages, &1))
+
+  defp page_cost(rules, pages, current_page), do:
+    pages
+    |> Enum.map(&page_pair_cost(rules, &1, current_page))
+    |> Enum.sum()
+
+  defp page_pair_cost(_rules, check_page, current_page) when
+    check_page == current_page, do: 0
+
+  defp page_pair_cost([], _check_page, _current_page), do: 0
+
+  defp page_pair_cost([[before, aft] | _remaining_rules], check_page, current_page) when
+    before == current_page and aft == check_page, do: aft
+
+  defp page_pair_cost([_rule | remaining_rules], check_page, current_page), do:
+    page_pair_cost(remaining_rules, check_page, current_page)
+end
+
+updates
+|> Enum.filter(&(!OrderChecker.check(rules, &1)))
+|> Enum.map(&Sorter.sort(rules, &1))
+|> Enum.map(fn update -> Enum.at(update, length(update) |> div(2)) end)
+|> Enum.sum()
+|> IO.inspect(label: "sum of mid elements of unsorted updates after sorting")
+```
