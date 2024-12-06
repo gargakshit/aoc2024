@@ -1,0 +1,204 @@
+# Day 6
+
+```elixir
+Mix.install([
+  {:kino, "~> 0.14.2"},
+  {:nx, "~> 0.9.2"}
+])
+```
+
+## Inputs
+
+```elixir
+input_box = Kino.Input.textarea("input")
+```
+
+```elixir
+input = Kino.Input.read(input_box)
+
+defmodule Mappers do
+  def empty(), do: 0
+  def obstacle(), do: 1
+  def oob(), do: 2
+
+  def map(:empty), do: empty()
+  def map(:obstacle), do: obstacle()
+  def map(:oob), do: oob()
+
+  def map(0), do: :empty
+  def map(1), do: :obstacle
+  def map(2), do: :oob
+end
+
+original_grid =
+  input
+  |> String.split("\n")
+  |> Enum.map(&String.to_charlist/1)
+  |> Enum.with_index()
+  |> Enum.map(fn {charlist, y} ->
+    charlist
+    |> Enum.with_index()
+    |> Enum.map(fn
+      {?., x} -> {x, y, :empty}
+      {?#, x} -> {x, y, :obstacle}
+      {?^, x} -> {x, y, {:guard, :up}}
+    end)
+  end)
+  |> IO.inspect(label: "original_grid")
+
+height =
+  original_grid
+  |> length()
+  |> IO.inspect(label: "height")
+
+width =
+  original_grid
+  |> hd()
+  |> length()
+  |> IO.inspect(label: "width")
+
+initial_guard_position =
+  original_grid
+  |> List.flatten()
+  |> Enum.find(&(elem(&1, 2) == {:guard, :up}))
+  |> then(fn {x, y, {:guard, dir}} -> {x, y, dir} end)
+  |> IO.inspect(label: "initial guard position")
+
+grid =
+  original_grid
+  |> Enum.map(&Enum.map(&1, fn
+    {x, y, {:guard, _dir}} -> [x, y, Mappers.empty()]
+    {x, y, typ} -> [x, y, Mappers.map(typ)]
+  end))
+  |> Nx.tensor()
+  # |> IO.inspect(label: "cleaned up grid")
+
+nil
+```
+
+## Part 1
+
+```elixir
+defmodule Simulation do
+  defp ninety(:up), do: :right
+  defp ninety(:right), do: :down
+  defp ninety(:down), do: :left
+  defp ninety(:left), do: :up
+
+  defp ninety({x, y, dir}), do: {x, y, ninety(dir)}
+
+  defp look(grid, {x, y, _dir}), do:
+    grid[y][x]
+    |> Nx.to_list()
+    |> Enum.at(2)
+    |> Mappers.map()
+
+  defp ahead({x, y, :up}), do: {x, y - 1, :up}
+  defp ahead({x, y, :right}), do: {x + 1, y, :right}
+  defp ahead({x, y, :down}), do: {x, y + 1, :down}
+  defp ahead({x, y, :left}), do: {x - 1, y, :left}
+
+  # Cases for when stepping will take me out of bound.
+  def next_position(_grid, {_current_x, current_y, :up}, {_max_x, _max_y}) when
+    current_y <= 0, do: :oob
+
+  def next_position(_grid, {current_x, _current_y, :right}, {max_x, _max_y}) when
+    current_x + 1 >= max_x, do: :oob
+  
+  def next_position(_grid, {_current_x, current_y, :down}, {_max_x, max_y}) when
+    current_y + 1 >= max_y, do: :oob
+  
+  def next_position(_grid, {current_x, _current_y, :left}, {_max_x, _max_y}) when
+    current_x <= 0, do: :oob
+
+  # General stuff.
+  def next_position(grid, state, {_max_x, _max_y}) do
+    case look(grid, ahead(state)) do
+      :empty -> ahead(state)
+      :obstacle -> ninety(state)
+      :oob -> raise "lookahead returned out of bounds. this is impossible."
+    end
+  end
+
+  def simulate_until_oob(grid, {current_x, current_y, _dir} = state, bounds, visited) do
+    visited = Nx.indexed_put(visited, Nx.tensor([current_y, current_x]), 1)
+    case next_position(grid, state, bounds) do
+      :oob -> {state, visited}
+      state -> simulate_until_oob(grid, state, bounds, visited)
+    end
+  end
+end
+
+visited =
+  original_grid
+  |> Enum.map(&Enum.map(&1, fn _ -> false end))
+  |> Nx.tensor()
+
+initial_state = initial_guard_position
+{final_state, visited} =
+  Simulation.simulate_until_oob(grid, initial_state, {width, height}, visited)
+  |> IO.inspect(label: "after simulation")
+
+visited
+|> Nx.to_list()
+|> Enum.map(&Enum.map(&1, fn
+  0 -> ?.
+  1 -> ?X
+end))
+|> Enum.map(&List.to_string/1)
+|> Enum.join("\n")
+|> IO.puts()
+
+visited
+|> Nx.flatten()
+|> Nx.to_list()
+|> Enum.sum()
+```
+
+## Part 2
+
+```elixir
+defmodule SimulationWithLoopDetection do
+  import Simulation
+
+  def introduce_obstacle(grid, x, y) do
+    Nx.indexed_put(grid, Nx.tensor([y, x, 2]), Mappers.obstacle())
+  end
+
+  def simulate_until_oob_or_loop(grid, state, bounds, visited) do
+    if MapSet.member?(visited, state) do
+      # Loop
+      {:loop, state, visited}
+    else
+      visited = MapSet.put(visited, state)
+      case next_position(grid, state, bounds) do
+        :oob -> {:oob, state, visited}
+        state -> simulate_until_oob_or_loop(grid, state, bounds, visited)
+      end
+    end
+  end
+end
+
+initial_state = initial_guard_position
+
+1..(height - 1)
+|> Enum.map(fn y ->
+  1..(width - 1)
+  |> Enum.map(fn x ->
+    IO.puts("Simulating with obstacle on #{x}, #{y}")
+
+    Task.async(fn ->
+      SimulationWithLoopDetection.introduce_obstacle(grid, x, y)
+      |> SimulationWithLoopDetection.simulate_until_oob_or_loop(initial_state, {width, height}, MapSet.new())
+      |> elem(0)
+    end)
+  end)
+  |> Enum.map(&Task.await/1)
+  |> Enum.map(fn
+    :loop -> 1
+    :oob -> 0
+  end)
+  |> Enum.sum()
+end)
+|> Enum.sum()
+```
