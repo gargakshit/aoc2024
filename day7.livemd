@@ -54,8 +54,13 @@ end)
 
 ```elixir
 defmodule FastCheck2 do
-  def concat_numbers(l, r), do:
-    (l * (10 ** length(Integer.digits(r)))) + r
+  defp num_digits(num, acc) when num > 0, do:
+    num_digits(div(num, 10), acc + 1)
+
+  defp num_digits(_num, acc), do: acc
+
+  defp concat_numbers(l, r), do:
+    (l * (10 ** num_digits(r, 0))) + r
 
   def check(expected, [], acc), do: acc == expected
   def check(expected, _numbers, acc) when acc > expected, do: false
