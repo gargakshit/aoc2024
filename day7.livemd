@@ -1,0 +1,75 @@
+# Day 7
+
+```elixir
+Mix.install([
+  {:kino, "~> 0.14.2"},
+  {:nx, "~> 0.9.2"}
+])
+```
+
+## Inputs
+
+```elixir
+input_box = Kino.Input.textarea("input")
+```
+
+```elixir
+input =
+  input_box
+  |> Kino.Input.read()
+  |> String.split("\n")
+  |> Enum.map(fn line ->
+    [left, right] = String.split(line, ": ")
+
+    right =
+      right
+      |> String.split(" ")
+      |> Enum.map(&String.to_integer/1)
+
+    {String.to_integer(left), right}
+  end)
+```
+
+## Part 1
+
+```elixir
+defmodule FastCheck do
+  def check(expected, [], acc), do: acc == expected
+  def check(expected, _numbers, acc) when acc > expected, do: false
+
+  def check(expected, [head | tail], acc), do:
+    check(expected, tail, acc * head) ||
+      check(expected, tail, acc + head)
+end
+
+input
+|> Task.async_stream(fn {expected, [acc | numbers]} ->
+  if FastCheck.check(expected, numbers, acc), do: expected, else: 0
+end)
+|> Enum.map(&elem(&1, 1))
+|> Enum.sum()
+```
+
+## Part 2
+
+```elixir
+defmodule FastCheck2 do
+  def concat_numbers(l, r), do:
+    (l * (10 ** length(Integer.digits(r)))) + r
+
+  def check(expected, [], acc), do: acc == expected
+  def check(expected, _numbers, acc) when acc > expected, do: false
+
+  def check(expected, [head | tail], acc), do:
+    check(expected, tail, acc * head) ||
+      check(expected, tail, acc + head) ||
+      check(expected, tail, concat_numbers(acc, head))
+end
+
+input
+|> Task.async_stream(fn {expected, [acc | numbers]} ->
+  if FastCheck2.check(expected, numbers, acc), do: expected, else: 0
+end)
+|> Enum.map(&elem(&1, 1))
+|> Enum.sum()
+```
